@@ -1,0 +1,6 @@
+fastapi
+pandas
+numpy
+spotipy
+sklearn
+
