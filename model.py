@@ -44,26 +44,23 @@ class SongRecommender:
         self.song_matrix = self.df[self.features].values
         self.song_norms = np.linalg.norm(self.song_matrix, axis=1)
 
-    def classify_language(self, text):
-        if 'ñ' in text:
-            return 2
-        elif any(char in text for char in ['é', 'è', 'à', 'ù', 'ì', 'ò', 'É', 'È', 'À', 'Ù', 'Ì', 'Ò']):
-            return 3
-        elif any(char in text for char in ['あ', 'い', 'う', 'え', 'お', 'か', 'き', 'く', 'け', 'こ']):
-            return 1
-        elif any(char in text for char in ['ㄱ', 'ㄴ', 'ㄷ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅅ', 'ㅇ', 'ㅈ', 'ㅊ', 'ㅏ', 'ㅑ', 'ㅓ', 'ㅕ', 'ㅗ', 'ㅛ', 'ㅜ', 'ㅠ', 'ㅡ', 'ㅣ']):
-            return 0
-        elif any(char in text for char in ['ə', 'Ə', 'ğ']):
-            return 4
-        elif any(char in text for char in [
-            'а', 'б', 'в', 'г', 'д', 'е', 'ё', 'ж', 'з', 'и', 'й', 'к', 'л', 
-            'м', 'н', 'о', 'п', 'р', 'с', 'т', 'у', 'ф', 'х', 'ц', 'ч', 'ш', 'щ', 
-            'ъ', 'ы', 'ь', 'э', 'ю', 'я','А','Б','В','Г','Д','Е','Ё','Ж','З','И','Й',
-            'К','Л','М','Н','О','П','Р','С','Т','У','Ф','Х','Ц','Ч',
-            'Ш','Щ','Ъ','Ы','Ь','Э','Ю','Я']):
-            return 5
-        else:
-            return 6 
+        def classify_language(text):
+            if any(char in text.lower() for char in ['ㄱ', 'ㄴ', 'ㄷ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅅ', 'ㅇ', 'ㅈ', 'ㅊ', 'ㅏ', 'ㅑ', 'ㅓ', 'ㅕ', 'ㅗ', 'ㅛ', 'ㅜ', 'ㅠ', 'ㅡ', 'ㅣ']):
+                return 0
+            elif any(char in text.lower() for char in ['あ', 'い', 'う', 'え', 'お', 'か', 'き', 'く', 'け', 'こ']):
+                return 1
+            elif 'ñ' in text:
+                return 2
+            elif any(char in text.lower() for char in ['é', 'è', 'à', 'ù', 'ì', 'ò']):
+                return 3
+            elif any(char in text.lower() for char in ['ə', 'ğ']):
+                return 4
+            elif any(char in text.lower() for char in [
+                'а', 'б', 'в', 'г', 'д', 'е', 'ё', 'ж', 'з', 'и', 'й', 'к', 'л', 
+                'м', 'н', 'о', 'п', 'р', 'с', 'т', 'у', 'ф', 'х', 'ц', 'ч', 'ш', 'щ', 
+                'ъ', 'ы', 'ь', 'э', 'ю', 'я']):
+                return 5
+            return 6
 
     # Function to get the audio features of a song if it is not in the dataset
     def unknown_song_vector(self, id):
