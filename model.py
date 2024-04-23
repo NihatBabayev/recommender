@@ -1,17 +1,23 @@
 import pandas as pd
 import numpy as np
+import json
 import spotipy
 import warnings
+import os
+from dotenv import load_dotenv
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.preprocessing import LabelEncoder
 from spotipy.oauth2 import SpotifyClientCredentials
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
 warnings.filterwarnings('ignore')
+load_dotenv()
 
 class SongRecommender:
     def __init__(self):
         # Spotify API credentials
-        self.cid = "d9219a18c2ed48e685ea287cbfcdda95"
-        self.secret = "b9492ce5ac57427c9ee60be103779a29"
+        self.cid = os.getenv("SPOTIFY_CLIENT_ID")
+        self.secret = os.getenv("SPOTIFY_CLIENT_SECRET")
         self.client_credentials_manager = SpotifyClientCredentials(
             client_id=self.cid, client_secret=self.secret
         )
@@ -43,24 +49,24 @@ class SongRecommender:
         self.df["song_vector"] = self.df[self.features].values.tolist()
         self.song_matrix = self.df[self.features].values
         self.song_norms = np.linalg.norm(self.song_matrix, axis=1)
+        self.TOP = 20
 
-        def classify_language(text):
-            if any(char in text.lower() for char in ['ㄱ', 'ㄴ', 'ㄷ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅅ', 'ㅇ', 'ㅈ', 'ㅊ', 'ㅏ', 'ㅑ', 'ㅓ', 'ㅕ', 'ㅗ', 'ㅛ', 'ㅜ', 'ㅠ', 'ㅡ', 'ㅣ']):
-                return 0
-            elif any(char in text.lower() for char in ['あ', 'い', 'う', 'え', 'お', 'か', 'き', 'く', 'け', 'こ']):
-                return 1
-            elif 'ñ' in text:
-                return 2
-            elif any(char in text.lower() for char in ['é', 'è', 'à', 'ù', 'ì', 'ò']):
-                return 3
-            elif any(char in text.lower() for char in ['ə', 'ğ']):
-                return 4
-            elif any(char in text.lower() for char in [
-                'а', 'б', 'в', 'г', 'д', 'е', 'ё', 'ж', 'з', 'и', 'й', 'к', 'л', 
-                'м', 'н', 'о', 'п', 'р', 'с', 'т', 'у', 'ф', 'х', 'ц', 'ч', 'ш', 'щ', 
-                'ъ', 'ы', 'ь', 'э', 'ю', 'я']):
-                return 5
-            return 6
+    # Simple function to classify the language of a by its characters
+    def classify_language(self, text):
+        char_categories = {
+            'ㄱㄴㄷㄹㅁㅂㅅㅇㅈㅊㅏㅑㅓㅕㅗㅛㅜㅠㅡㅣ': 0,
+            'あいうえおかきくけこ': 1,
+            'ñ': 2,
+            'éèàùìò': 3,
+            'əğ': 4,
+            'абвгдежзийклмнопрстуфхцчшщъыьэюя': 5
+        }
+
+        text_lower = text.lower()
+        for chars, category in char_categories.items():
+            if any(char in text_lower for char in chars):
+                return category
+        return 6
 
     # Function to get the audio features of a song if it is not in the dataset
     def unknown_song_vector(self, id):
@@ -109,9 +115,20 @@ class SongRecommender:
 
         return audio_data[0]  
 
-    def get_top_similar_songs(self, search_string):
+    def unknown_song_matrix(self, candidate_unknown_ids):
+        unknown_song_matrix = []
+        with ThreadPoolExecutor(max_workers=50) as executor:
+            future_to_track = {executor.submit(self.unknown_song_vector, i): i for i in candidate_unknown_ids}
+            for future in as_completed(future_to_track):
+                data = future.result()
+                if data is not None:
+                    unknown_song_matrix.append(data)
+
+        return np.array(unknown_song_matrix)      
+
+    def get_song_recommendations(self, song_query):
         try:
-            results = self.sp.search(q=search_string, limit=1)
+            results = self.sp.search(q=song_query, limit=1)
             id = results['tracks']['items'][0]['id']
             song_name = results['tracks']['items'][0]['name']
             artist_name = results['tracks']['items'][0]['artists'][0]['name']
@@ -125,9 +142,8 @@ class SongRecommender:
         except IndexError:
             input_song_vector = self.unknown_song_vector(id)
 
-        TOP = 20
         similarities = np.dot(self.song_matrix, input_song_vector) / (self.song_norms * np.linalg.norm(input_song_vector))
-        sorted_indices = np.argsort(similarities)[::-1][:TOP]
+        sorted_indices = np.argsort(similarities)[::-1][:self.TOP]
         top_songs = self.df.loc[sorted_indices, ['track_name', 'artist_name', 'track_id']]
         top_songs['similarity'] = similarities[sorted_indices]
 
@@ -158,5 +174,76 @@ class SongRecommender:
             }])
             top_songs = pd.concat([new_song, top_songs], ignore_index=True)
 
-        return top_songs.head(TOP).to_json(orient="records")
+        return json.loads(top_songs.head(self.TOP).to_json(orient="records"))
+    
+    def get_playlist_recommendations(self, playlist_url):
+        playlist_link = playlist_url        
+        playlist_URI = playlist_link.split("/")[-1].split("?")[0]
+        playlist_data = self.sp.playlist(playlist_URI)
+
+        user_id = playlist_data["owner"]["display_name"]
+        playlist_name = playlist_data["name"]
+        number_of_tracks = playlist_data["tracks"]["total"]
+        playlist_cover_image = playlist_data["images"][0]["url"]
+        duration = sum([x["track"]["duration_ms"] for x in self.sp.playlist_tracks(playlist_URI)["items"]])
+        hours, minutes = duration//3600000, duration % 3600000 // 60000
+        duration = f"{hours} hours {minutes} minutes" if hours else f"{minutes} minutes" 
+        
+
+        print(f"Username: {user_id}")
+        print(f"Playlist Name: {playlist_name}")
+        print(f"Number of Tracks: {number_of_tracks}")
+        print(f"Playlist Cover Image: {playlist_cover_image}")
+        print(f"Duration: {duration}")
+
+        track_uris = [track["track"]["uri"] for track in playlist_data["tracks"]["items"]]
+        ids_playlist = [uri.split(":")[-1] for uri in track_uris]
+
+        candidate_known_ids = []
+        candidate_unknown_ids = []
+
+        for id in ids_playlist:
+            try:
+                input_song_vector_d = self.df[self.df['track_id'] == id]['song_vector'].values[0]
+                candidate_known_ids.append(input_song_vector_d)
+            except IndexError:
+                candidate_unknown_ids.append(id)
+
+        candidate_known_ids = np.array(candidate_known_ids)
+        song_vectors = np.concatenate((candidate_known_ids, self.unknown_song_matrix(candidate_unknown_ids)), axis=0)
+        song_vectors = np.array([x for x in song_vectors if x is not None])
+        input_song_vector = np.mean(song_vectors, axis=0)
+
+        similarities = np.dot(self.song_matrix, input_song_vector) / (self.song_norms * np.linalg.norm(input_song_vector))
+        sorted_indices = np.argsort(similarities)[::-1][:self.TOP]
+        top_songs = self.df.loc[sorted_indices, ['track_name', 'artist_name', 'track_id']] 
+        top_songs['similarity'] = similarities[sorted_indices]
+        top_songs = top_songs[~top_songs['track_id'].isin(ids_playlist)]
+
+        mp3_urls = []
+        spotify_urls = []
+        image_urls = []
+        ids = top_songs['track_id'].tolist()
+        results = self.sp.tracks(ids)
+        print(len(results['tracks']))
+
+        for track in results['tracks']:
+            mp3_urls.append(track['preview_url'])
+            spotify_urls.append(track['external_urls']['spotify'])
+            image_urls.append(track['album']['images'][0]['url'])
+
+        top_songs['mp3_url'] = mp3_urls
+        top_songs['spotify_url'] = spotify_urls
+        top_songs['image_url'] = image_urls
+
+        final_json = {
+            "username": user_id,
+            "playlist": playlist_name,
+            "n_tracks": number_of_tracks,
+            "image": playlist_cover_image,
+            "duration": duration,
+            "songs": json.loads(top_songs.head(self.TOP).to_json(orient="records"))
+        }
+
+        return final_json
         
