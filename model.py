@@ -133,9 +133,8 @@ class SongRecommender:
             song_name = results['tracks']['items'][0]['name']
             artist_name = results['tracks']['items'][0]['artists'][0]['name']
             print(song_name, artist_name)
-        except IndexError:
-            print("EXCEPTION: Song not found on Spotify.")
-            return
+        except IndexError as e:
+            return f"EXCEPTION: SONG NOT FOUND ON SPOTFIY. {e}"
 
         try:
             input_song_vector = np.array(self.df[self.df['track_id'] == id]['song_vector'].values[0])
@@ -179,8 +178,12 @@ class SongRecommender:
     def get_playlist_recommendations(self, playlist_url):
         playlist_link = playlist_url        
         playlist_URI = playlist_link.split("/")[-1].split("?")[0]
-        playlist_data = self.sp.playlist(playlist_URI)
-
+        
+        try:
+            playlist_data = self.sp.playlist(playlist_URI)
+        except Exception as e:
+            return f"EXCEPTION: INVALID SPOTIFY PLAYLIST URL. {e}"
+        
         user_id = playlist_data["owner"]["display_name"]
         playlist_name = playlist_data["name"]
         number_of_tracks = playlist_data["tracks"]["total"]
@@ -246,4 +249,12 @@ class SongRecommender:
         }
 
         return final_json
+    
+# def main():
+#     recommender = SongRecommender()
+#     print(recommender.get_playlist_recommendations("how are you?"))
+    
+# if __name__ == "__main__":
+#     main()
         
+    

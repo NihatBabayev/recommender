@@ -12,3 +12,4 @@ async def get_song_recommendations(song_query: str):
 @app.get("/getplaylistrecommendations/")
 async def get_playlist_recommendations(playlist_url: str):
     return recommender.get_playlist_recommendations(playlist_url)
+
