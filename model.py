@@ -132,7 +132,7 @@ class SongRecommender:
             id = results['tracks']['items'][0]['id']
             song_name = results['tracks']['items'][0]['name']
             artist_name = results['tracks']['items'][0]['artists'][0]['name']
-            print(song_name, artist_name)
+            # print(song_name, artist_name)
         except IndexError as e:
             return f"EXCEPTION: SONG NOT FOUND ON SPOTFIY. {e}"
 
@@ -193,11 +193,11 @@ class SongRecommender:
         duration = f"{hours} hours {minutes} minutes" if hours else f"{minutes} minutes" 
         
 
-        print(f"Username: {user_id}")
-        print(f"Playlist Name: {playlist_name}")
-        print(f"Number of Tracks: {number_of_tracks}")
-        print(f"Playlist Cover Image: {playlist_cover_image}")
-        print(f"Duration: {duration}")
+        # print(f"Username: {user_id}")
+        # print(f"Playlist Name: {playlist_name}")
+        # print(f"Number of Tracks: {number_of_tracks}")
+        # print(f"Playlist Cover Image: {playlist_cover_image}")
+        # print(f"Duration: {duration}")
 
         track_uris = [track["track"]["uri"] for track in playlist_data["tracks"]["items"]]
         ids_playlist = [uri.split(":")[-1] for uri in track_uris]
@@ -228,7 +228,6 @@ class SongRecommender:
         image_urls = []
         ids = top_songs['track_id'].tolist()
         results = self.sp.tracks(ids)
-        print(len(results['tracks']))
 
         for track in results['tracks']:
             mp3_urls.append(track['preview_url'])
