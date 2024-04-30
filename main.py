@@ -1,15 +1,16 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, APIRouter
 from model import SongRecommender
-import json
 
 app = FastAPI()
 recommender = SongRecommender()
+recommendations_router = APIRouter()
 
-@app.get("/getsongrecommendations/")
+@recommendations_router.get("/songs/")
 async def get_song_recommendations(song_query: str):
     return recommender.get_song_recommendations(song_query)
 
-@app.get("/getplaylistrecommendations/")
+@recommendations_router.get("/playlists/")
 async def get_playlist_recommendations(playlist_url: str):
     return recommender.get_playlist_recommendations(playlist_url)
 
+app.include_router(recommendations_router, prefix="/recommendations", tags=["recommendations"])

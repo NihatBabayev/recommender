@@ -180,7 +180,9 @@ class SongRecommender:
         playlist_URI = playlist_link.split("/")[-1].split("?")[0]
         
         try:
+            print('hello')
             playlist_data = self.sp.playlist(playlist_URI)
+            print('hello')
         except Exception as e:
             return f"EXCEPTION: INVALID SPOTIFY PLAYLIST URL. {e}"
         
@@ -249,11 +251,12 @@ class SongRecommender:
 
         return final_json
     
-# def main():
-#     recommender = SongRecommender()
-#     print(recommender.get_playlist_recommendations("how are you?"))
+def main():
+
+    recommender = SongRecommender()
+    print(recommender.get_song_recommendations("the weeknd after horus"))
     
-# if __name__ == "__main__":
-#     main()
+if __name__ == "__main__":
+    main()
         
     
