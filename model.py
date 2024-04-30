@@ -176,24 +176,24 @@ class SongRecommender:
         return json.loads(top_songs.head(self.TOP).to_json(orient="records"))
     
     def get_playlist_recommendations(self, playlist_url):
-        playlist_link = playlist_url        
-        playlist_URI = playlist_link.split("/")[-1].split("?")[0]
+        playlist_URI = playlist_url.split("/")[-1].split("?")[0]
         
         try:
-            print('hello')
             playlist_data = self.sp.playlist(playlist_URI)
-            print('hello')
         except Exception as e:
             return f"EXCEPTION: INVALID SPOTIFY PLAYLIST URL. {e}"
         
-        user_id = playlist_data["owner"]["display_name"]
+        user_id = playlist_data["owner"]["id"]
+        user_profile = self.sp.user(user_id)
+        
+        user_profile_picture = user_profile["images"][0]["url"]
+        username = playlist_data["owner"]["display_name"]
         playlist_name = playlist_data["name"]
         number_of_tracks = playlist_data["tracks"]["total"]
         playlist_cover_image = playlist_data["images"][0]["url"]
         duration = sum([x["track"]["duration_ms"] for x in self.sp.playlist_tracks(playlist_URI)["items"]])
         hours, minutes = duration//3600000, duration % 3600000 // 60000
         duration = f"{hours} hours {minutes} minutes" if hours else f"{minutes} minutes" 
-        
 
         # print(f"Username: {user_id}")
         # print(f"Playlist Name: {playlist_name}")
@@ -241,7 +241,8 @@ class SongRecommender:
         top_songs['image_url'] = image_urls
 
         final_json = {
-            "username": user_id,
+            "username": username,
+            "profile_picture": user_profile_picture,
             "playlist": playlist_name,
             "n_tracks": number_of_tracks,
             "image": playlist_cover_image,
@@ -252,9 +253,8 @@ class SongRecommender:
         return final_json
     
 def main():
-
     recommender = SongRecommender()
-    print(recommender.get_song_recommendations("the weeknd after horus"))
+    print(recommender.get_playlist_recommendations("https://open.spotify.com/playlist/73XPRn8DExoUaCGdQEWogX?si=1ba7dec3ade945f2"))
     
 if __name__ == "__main__":
     main()
