@@ -6,9 +6,8 @@ This repository contains a music recommendation system using different approache
 
 ### Prerequisites
 
-Make sure you have the following installed:
+Make sure you have the following libraries installed:
 
-- Python 3.x
 - `fastapi`
 - `pandas`
 - `numpy`
