@@ -252,11 +252,11 @@ class SongRecommender:
 
         return final_json
     
-def main():
-    recommender = SongRecommender()
-    print(recommender.get_playlist_recommendations("https://open.spotify.com/playlist/73XPRn8DExoUaCGdQEWogX?si=1ba7dec3ade945f2"))
+# def main():
+#     recommender = SongRecommender()
+#     print(recommender.get_playlist_recommendations("https://open.spotify.com/playlist/73XPRn8DExoUaCGdQEWogX?si=1ba7dec3ade945f2"))
     
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+#     main()
         
     
