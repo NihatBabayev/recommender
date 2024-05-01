@@ -9,10 +9,11 @@ This repository contains a music recommendation system using different approache
 Make sure you have the following installed:
 
 - Python 3.x
+- `fastapi`
 - `pandas`
 - `numpy`
 - `spotipy`
-- `scikit-learn`
+- `sklearn`
 - `python-dotenv`
 
 ### Installation
