@@ -1,6 +1,6 @@
 # Song Recommender
 
-This repository contains a music recommendation system using different approaches and data retrieval from Spotify's API
+This repository contains a music recommendation system for student led project using content-based filtering and data retrieval from Spotify's API.
 
 ## Getting Started
 
