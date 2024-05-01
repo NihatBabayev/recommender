@@ -1,6 +1,6 @@
 # Song Recommender
 
-This repository contains a Python class `SongRecommender` which provides functionality to recommend similar songs or generate recommendations for Spotify playlists based on audio features.
+This repository contains a music recommendation system using different approaches and data retrieval from Spotify's API
 
 ## Getting Started
 
