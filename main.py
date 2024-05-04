@@ -1,8 +1,8 @@
 from fastapi import FastAPI, APIRouter
-from recommender import SongRecommender
+from recommender import Recommender
 
 app = FastAPI()
-recommender = SongRecommender()
+recommender = Recommender()
 recommendations_router = APIRouter()
 
 @recommendations_router.post("/songs/")
