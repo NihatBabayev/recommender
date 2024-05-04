@@ -1,5 +1,5 @@
 from fastapi import FastAPI, APIRouter
-from model import SongRecommender
+from recommender import SongRecommender
 
 app = FastAPI()
 recommender = SongRecommender()
