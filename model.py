@@ -9,7 +9,6 @@ from sklearn.preprocessing import MinMaxScaler
 from sklearn.preprocessing import LabelEncoder
 from spotipy.oauth2 import SpotifyClientCredentials
 from concurrent.futures import ThreadPoolExecutor, as_completed
-
 warnings.filterwarnings('ignore')
 load_dotenv()
 
@@ -132,7 +131,6 @@ class SongRecommender:
             id = results['tracks']['items'][0]['id']
             song_name = results['tracks']['items'][0]['name']
             artist_name = results['tracks']['items'][0]['artists'][0]['name']
-            # print(song_name, artist_name)
         except IndexError as e:
             return f"EXCEPTION: SONG NOT FOUND ON SPOTFIY. {e}"
 
@@ -175,14 +173,7 @@ class SongRecommender:
 
         return json.loads(top_songs.head(self.TOP).to_json(orient="records"))
     
-    def get_playlist_recommendations(self, playlist_url):
-        playlist_URI = playlist_url.split("/")[-1].split("?")[0]
-        
-        try:
-            playlist_data = self.sp.playlist(playlist_URI)
-        except Exception as e:
-            return f"EXCEPTION: INVALID SPOTIFY PLAYLIST URL. {e}"
-        
+    def get_playlist_info(self, playlist_data, playlist_URI):
         user_id = playlist_data["owner"]["id"]
         user_profile = self.sp.user(user_id)
         
@@ -191,16 +182,30 @@ class SongRecommender:
         playlist_name = playlist_data["name"]
         number_of_tracks = playlist_data["tracks"]["total"]
         playlist_cover_image = playlist_data["images"][0]["url"]
-        duration = sum([x["track"]["duration_ms"] for x in self.sp.playlist_tracks(playlist_URI)["items"]])
+
+        playlist_tracks = self.sp.playlist_tracks(playlist_URI)
+        total_tracks = playlist_tracks["total"]
+        tracks = playlist_tracks["items"]
+
+        while len(tracks) < total_tracks:
+            playlist_tracks = self.sp.playlist_tracks(playlist_URI, offset=len(tracks))
+            tracks.extend(playlist_tracks["items"])
+
+        duration = sum([track["track"]["duration_ms"] for track in tracks])
         hours, minutes = duration//3600000, duration % 3600000 // 60000
-        duration = f"{hours} hours {minutes} minutes" if hours else f"{minutes} minutes" 
+        duration = f"{hours} hours {minutes} minutes" if hours else f"{minutes} minutes"
 
-        # print(f"Username: {user_id}")
-        # print(f"Playlist Name: {playlist_name}")
-        # print(f"Number of Tracks: {number_of_tracks}")
-        # print(f"Playlist Cover Image: {playlist_cover_image}")
-        # print(f"Duration: {duration}")
-
+        return user_profile_picture, username, playlist_name, number_of_tracks, playlist_cover_image, duration
+        
+    def get_playlist_recommendations_v1(self, playlist_url):
+        playlist_URI = playlist_url.split("/")[-1].split("?")[0]
+        
+        try:
+            playlist_data = self.sp.playlist(playlist_URI)
+        except Exception as e:
+            return f"EXCEPTION: INVALID SPOTIFY PLAYLIST URL. {e}"
+        
+        user_profile_picture, username, playlist_name, number_of_tracks, playlist_cover_image, duration = self.get_playlist_info(playlist_data, playlist_URI)
         track_uris = [track["track"]["uri"] for track in playlist_data["tracks"]["items"]]
         ids_playlist = [uri.split(":")[-1] for uri in track_uris]
 
@@ -252,9 +257,89 @@ class SongRecommender:
 
         return final_json
     
+    def get_playlist_recommendations_v2(self, playlist_url):
+        playlist_URI = playlist_url.split("/")[-1].split("?")[0]
+        
+        try:
+            playlist_data = self.sp.playlist(playlist_URI)
+        except Exception as e:
+            return f"EXCEPTION: INVALID SPOTIFY PLAYLIST URL. {e}"
+        
+        user_profile_picture, username, playlist_name, number_of_tracks, playlist_cover_image, duration = self.get_playlist_info(playlist_data, playlist_URI)
+        track_uris = [track["track"]["uri"] for track in playlist_data["tracks"]["items"]]
+        ids_playlist = [uri.split(":")[-1] for uri in track_uris]
+
+        candidate_known_ids = []
+        candidate_unknown_ids = []
+
+        for id in ids_playlist:
+            try:
+                input_song_vector_d = self.df[self.df['track_id'] == id]['song_vector'].values[0]
+                candidate_known_ids.append(input_song_vector_d)
+            except IndexError:
+                candidate_unknown_ids.append(id)
+
+        candidate_known_ids = np.array(candidate_known_ids)
+        song_vectors = np.concatenate((candidate_known_ids, self.unknown_song_matrix(candidate_unknown_ids)), axis=0)
+        song_vectors = np.array([x for x in song_vectors if x is not None])
+        song_vectors_transpose = song_vectors.T
+        similarities_matrix = np.dot(self.song_matrix, song_vectors_transpose) / (self.song_norms[:, np.newaxis] * np.linalg.norm(song_vectors_transpose, axis=0)) 
+        similarities_matrix_transpose = similarities_matrix.T
+        
+        c = {}
+        for vector in similarities_matrix_transpose:
+            indices = np.argsort(vector)[::-1][:5]
+            values = vector[indices]
+            for j in range(len(indices)):
+                c[indices[j]] = values[j]
+                
+        sorted_c = dict(sorted(c.items(), key=lambda item: item[1], reverse=True))
+        
+        top_songs_new = pd.DataFrame()
+        indices = []
+        similarities = []
+
+        for key, value in sorted_c.items():
+            if value < 1:
+                indices.append(key)
+                similarities.append(value)
+            if len(indices) == 20:
+                break
+
+        top_songs_new = self.df.loc[indices, ['track_name', 'artist_name', 'track_id']] 
+        top_songs_new['similarity'] = similarities
+        top_songs_new = top_songs_new[~top_songs_new['track_id'].isin(ids_playlist)]
+
+        mp3_urls = []
+        spotify_urls = []
+        image_urls = []
+        ids = top_songs_new['track_id'].tolist()
+        results = self.sp.tracks(ids)
+
+        for track in results['tracks']:
+            mp3_urls.append(track['preview_url'])
+            spotify_urls.append(track['external_urls']['spotify'])
+            image_urls.append(track['album']['images'][0]['url'])
+
+        top_songs_new['mp3_url'] = mp3_urls
+        top_songs_new['spotify_url'] = spotify_urls
+        top_songs_new['image_url'] = image_urls
+        
+        final_json = {
+            "username": username,
+            "profile_picture": user_profile_picture,
+            "playlist": playlist_name,
+            "n_tracks": number_of_tracks,
+            "image": playlist_cover_image,
+            "duration": duration,
+            "songs": json.loads(top_songs_new.head(self.TOP).to_json(orient="records"))
+        }
+
+        return final_json
+        
 # def main():
 #     recommender = SongRecommender()
-#     print(recommender.get_playlist_recommendations("https://open.spotify.com/playlist/73XPRn8DExoUaCGdQEWogX?si=1ba7dec3ade945f2"))
+#     print(recommender.get_playlist_recommendations_v2("https://open.spotify.com/playlist/73XPRn8DExoUaCGdQEWogX?si=1ba7dec3ade945f2"))
     
 # if __name__ == "__main__":
 #     main()
