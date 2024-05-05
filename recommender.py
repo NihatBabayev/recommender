@@ -176,7 +176,7 @@ class Recommender:
             song_name = results['tracks']['items'][0]['name']
             artist_name = results['tracks']['items'][0]['artists'][0]['name']
         except IndexError as e:
-            return f"EXCEPTION: SONG NOT FOUND ON SPOTFIY. {e}"
+            return f"EXCEPTION: SONG NOT FOUND ON SPOTIFY. {e}"
 
         try:
             input_song_vector = np.array(self.df[self.df['track_id'] == id]['song_vector'].values[0])
